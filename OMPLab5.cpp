@@ -5,7 +5,7 @@
 
 using namespace std;
 
-const int N = 1000000;
+const int N = 20000000;
 
 void initMass(int **Array) {
 	
@@ -49,7 +49,7 @@ int calculation_sequental(int *A, int *B) {
 	return sum;
 }
 
-int calculation_reduction(int *A, int *B, bool parall) {
+int calculation_two_sections(int *A, int *B, bool parall) {
 	int sum = 0;
 
 		#pragma omp sections
@@ -73,87 +73,35 @@ int calculation_reduction(int *A, int *B, bool parall) {
 	return sum;
 }
 
-int calculation_atomic(int *A, int *B, int N, bool parall) {
+
+int calculation_four_sections(int *A, int *B, bool parall) {
 	int sum = 0;
-	int i, tmp;
-	#pragma omp parallel if(parall) shared(sum)
-	{
-	
-		#pragma omp for private(i, tmp)
-		for (i = 0; i < N; i++) {
-
-			tmp = max(A[i] + B[i], 4 * A[i] + B[i]);
-
-			if (tmp > 1) {
-				#pragma omp atomic
-				sum += tmp;
-			}
-		}
-	}
-	return sum;
-}
-
-int section_atomic(int *A, int *B, bool parall) {
-
-	int sum = 0;
-
+	omp_set_num_threads(4);
 #pragma omp sections
 	{
 
 #pragma omp section 
 		{
-			sum += calculation_atomic(A, B, N / 2, true);
+			sum += func_for_reduction(A, B, N / 4, true);
 
 			//cout << sum << endl;
 		}
 #pragma omp section
 		{
-			sum += calculation_atomic(A + N / 2, B + N / 2, N / 2, true);
+			sum += func_for_reduction(A + N / 4, B + N / 4, N / 4, true);
 
 			//cout << sum << endl;
 
 		}
-
-	}
-	return sum;
-}
-
-int calculation_critical(int *A, int *B, int N, bool parall) {
-	int sum = 0;
-	int i, tmp;
-	#pragma omp parallel if(parall) shared(sum, tmp)
-	{
-		#pragma omp for private(i)
-		for (i = 0; i < N; i++) {
-			#pragma omp critical 
-			{
-				tmp = max(A[i] + B[i], 4 * A[i] + B[i]);
-				//cout << tmp << endl;
-				if (tmp > 1) {
-						sum += tmp;
-				}
-			}
-		}
-	}
-	return sum;
-}
-
-int section_critical(int *A, int *B, bool parall) {
-
-	int sum = 0;
-
-#pragma omp sections
-	{
-
 #pragma omp section 
 		{
-			sum += calculation_critical(A, B, N / 2, true);
+			sum += func_for_reduction(A + N / 2, B + N / 2, N / 4, true);
 
 			//cout << sum << endl;
 		}
 #pragma omp section
 		{
-			sum += calculation_critical(A + N / 2, B + N / 2, N / 2, true);
+			sum += func_for_reduction(A + (N * 3) / 4, B + (N * 3) / 4, N / 4, true);
 
 			//cout << sum << endl;
 
@@ -162,6 +110,70 @@ int section_critical(int *A, int *B, bool parall) {
 	}
 	return sum;
 }
+
+int calculation_eight_sections(int *A, int *B, bool parall) {
+	int sum = 0;
+	omp_set_num_threads(8);
+#pragma omp sections
+	{
+		//1
+#pragma omp section 
+		{
+			sum += func_for_reduction(A, B, N / 8, true);
+
+			//cout << sum << endl;
+		}//2
+#pragma omp section
+		{
+			sum += func_for_reduction(A + N / 8, B + N / 8, N / 8, true);
+
+			//cout << sum << endl;
+
+		}//3
+#pragma omp section 
+		{
+			sum += func_for_reduction(A + N / 4, B + N / 4, N / 8, true);
+
+			//cout << sum << endl;
+		}//4
+#pragma omp section
+		{
+			sum += func_for_reduction(A + (N * 3) / 8, B + (N * 3) / 8, N / 8, true);
+
+			//cout << sum << endl;
+
+		}//5
+#pragma omp section 
+		{
+			sum += func_for_reduction(A + N / 2, B + N / 2, N / 8, true);
+
+			//cout << sum << endl;
+		}//6
+#pragma omp section
+		{
+			sum += func_for_reduction(A + (N * 5) / 8, B + (N * 5) / 8, N / 8, true);
+
+			//cout << sum << endl;
+
+		}//7
+#pragma omp section 
+		{
+			sum += func_for_reduction(A + (N * 6) / 8, B + (N * 6) / 8, N / 8, true);
+
+			//cout << sum << endl;
+		}//8
+#pragma omp section
+		{
+			sum += func_for_reduction(A + (N * 7) / 8, B + (N * 7) / 8, N / 8, true);
+
+			//cout << sum << endl;
+
+		}
+
+	}
+	return sum;
+}
+
 
 int main() {
 
@@ -179,35 +191,34 @@ int main() {
 
 
 
-			start = omp_get_wtime();
-			sum = calculation_sequental(Array1, Array2);
-			end = omp_get_wtime();
-			cout << "Sequental result: " << sum << "\nTime = " << end - start << endl;
+	start = omp_get_wtime();
+	sum = calculation_sequental(Array1, Array2);
+	end = omp_get_wtime();
+	cout << "Sequental result: " << sum << "\nTime = " << end - start << endl;
 
 		
 
-			sum = 0;
-			start = omp_get_wtime();
-			sum = calculation_reduction(Array1, Array2, 1);
-			end = omp_get_wtime();
-			cout << "Parallel result with reduction: " << sum << "\nTime = " << end - start << endl;
+	sum = 0;
+	start = omp_get_wtime();
+	sum = calculation_two_sections(Array1, Array2, 1);
+	end = omp_get_wtime();
+	cout << "Parallel result with 2 sections: " << sum << "\nTime = " << end - start << endl;
+
+
+	sum = 0;
+	start = omp_get_wtime();
+	sum = calculation_four_sections(Array1, Array2, 1);
+	end = omp_get_wtime();
+	cout << "Parallel result with 4 sections: " << sum << "\nTime = " << end - start << endl;
+
+
+	sum = 0;
+	start = omp_get_wtime();
+	sum = calculation_eight_sections(Array1, Array2, 1);
+	end = omp_get_wtime();
+	cout << "Parallel result with 8 sections: " << sum << "\nTime = " << end - start << endl;
 		
 
-
-			sum = 0;
-			start = omp_get_wtime();
-			sum = section_atomic(Array1, Array2, 1);
-			end = omp_get_wtime();
-			cout << "Parallel result with atomic: " << sum << "\nTime = " << end - start << endl;
-		
-
-
-			sum = 0;
-			start = omp_get_wtime();
-			sum = section_critical(Array1, Array2, 1);
-			end = omp_get_wtime();
-			cout << "Parallel result with critical: " << sum << "\nTime = " << end - start << endl;
-		
 
 	
 	delete[] Array1;
